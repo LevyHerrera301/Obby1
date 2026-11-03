@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>OBBY INSANO</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+<style>
+  :root{--ui:'Fredoka One','Baloo 2','Trebuchet MS',system-ui,sans-serif}
+  html,body{margin:0;height:100%;overflow:hidden;background:#8fd3ff;font-family:var(--ui);font-weight:400;user-select:none;-webkit-user-select:none}
+  canvas#game{display:block;width:100%;height:100%;touch-action:none}
+  .outline{color:#fff;text-shadow:-2px -2px 0 #1b1b2f,2px -2px 0 #1b1b2f,-2px 2px 0 #1b1b2f,2px 2px 0 #1b1b2f,0 4px 0 rgba(0,0,0,.35)}
+  .chip{background:rgba(20,22,45,.72);border:3px solid #fff;border-radius:14px;padding:4px 14px;display:flex;gap:10px;align-items:center}
+  #hud{display:none}
+  #stats{position:fixed;top:14px;left:14px;display:flex;flex-direction:column;gap:6px;font-size:24px;pointer-events:none}
+  #stats .chip{min-width:140px}
+  #stageBox{position:fixed;top:14px;left:50%;transform:translateX(-50%);text-align:center;min-width:300px;pointer-events:none}
+  #stageName{font-size:24px}
+  #barW{height:16px;background:rgba(20,22,45,.72);border:3px solid #fff;border-radius:10px;overflow:hidden;margin-top:6px}
+  #barFill{height:100%;width:0;background:linear-gradient(90deg,#4cd964,#ffd23f);transition:width .2s}
+  #guide{position:fixed;top:14px;right:14px;pointer-events:none;font-size:18px}
+  #arrow{display:inline-block;font-size:38px;color:#ffd23f;text-shadow:0 3px 0 #0008;transition:transform .08s linear}
+  #gDist{font-size:24px}
+  #hint{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);font-size:22px;text-align:center;pointer-events:none;max-width:90vw}
+  #toast{position:fixed;top:28%;left:50%;transform:translate(-50%,-50%);font-size:46px;opacity:0;pointer-events:none;text-align:center;white-space:nowrap}
+  #toast.show{animation:pop 2.4s ease forwards}
+  @keyframes pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.12)}20%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-62%) scale(1)}}
+  #flash{position:fixed;inset:0;background:#ff2d2d;opacity:0;pointer-events:none}
+  #flash.on{animation:fl .5s ease-out}
+  @keyframes fl{0%{opacity:.55}100%{opacity:0}}
+  .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,14,40,.55);backdrop-filter:blur(3px);z-index:10}
+  .card{background:#fff;color:#1b1b2f;border-radius:26px;border:5px solid #1b1b2f;box-shadow:0 10px 0 #1b1b2f;padding:24px 32px;max-width:640px;width:calc(100% - 40px);text-align:center;max-height:92vh;overflow:auto}
+  .card h1{margin:0 0 4px;font-size:46px;color:#ff5a5f;font-weight:400}
+  .sub{font-size:19px;margin:6px 0 4px}
+  .keys{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:14px 0;text-align:left}
+  .key{background:#eef2ff;border-radius:14px;padding:10px 12px;display:flex;align-items:center;gap:6px;font-size:17px;flex-wrap:wrap}
+  kbd{background:#1b1b2f;color:#fff;border-radius:8px;padding:3px 9px;font-family:inherit;font-size:15px;text-align:center}
+  .rules{text-align:left;font-size:17px;margin:6px 0 12px;padding-left:22px;line-height:1.5}
+  .btn{font-family:inherit;font-size:30px;color:#fff;background:#2ecc71;border:4px solid #1b1b2f;border-radius:18px;padding:10px 40px;cursor:pointer;box-shadow:0 6px 0 #1b1b2f;margin-top:6px}
+  .btn:active{transform:translateY(4px);box-shadow:0 2px 0 #1b1b2f}
+  .small{font-size:13px;color:#667;margin:12px 0 0}
+  .stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:16px 0;font-size:22px}
+  .stats div{background:#eef2ff;border-radius:14px;padding:10px 6px}
+  .stats b{display:block;font-size:30px;font-weight:400}
+  #stars{font-size:48px;margin:4px 0}
+  #joy{position:fixed;left:24px;bottom:28px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.22);border:3px solid rgba(255,255,255,.7);display:none;touch-action:none}
+  #knob{position:absolute;left:35px;top:35px;width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.75);pointer-events:none}
+  #jumpBtn{position:fixed;right:28px;bottom:36px;width:100px;height:100px;border-radius:50%;background:rgba(46,204,113,.8);border:4px solid #fff;display:none;align-items:center;justify-content:center;color:#fff;font-size:22px;touch-action:none}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div id="stats">
+    <div class="chip outline">coins <span id="coins">0</span>/<span id="coinsTot">0</span></div>
+    <div class="chip outline">deaths <span id="deaths">0</span></div>
+    <div class="chip outline">time <span id="time">0:00.0</span></div>
+  </div>
+  <div id="stageBox">
+    <div id="stageName" class="outline">ETAPA 1</div>
+    <div id="barW"><div id="barFill"></div></div>
+  </div>
+  <div id="guide" class="chip outline">
+    <span id="arrow"> </span>
+    <div><div id="gTxt">Siguiente</div><div id="gDist">0 m</div></div>
+  </div>
+  <div id="hint" class="chip outline"></div>
+  <div id="toast" class="outline"></div>
+  <div id="flash"></div>
+</div>
+<div id="joy"><div id="knob"></div></div>
+<div id="jumpBtn">SALTAR</div>
+
+<div id="intro" class="modal"><div class="card">
+  <h1>OBBY INSANO</h1>
+  <p class="sub">Llega hasta el <b>trofeo dorado</b> saltando de plataforma en plataforma. ¡No te caigas!</p>
+  <div class="keys">
+    <div class="key"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Moverte</div>
+    <div class="key"><kbd>ESPACIO</kbd> Saltar</div>
+    <div class="key"><kbd>Arrastrar</kbd> Girar cámara</div>
+    <div class="key"><kbd>R</kbd> Volver al checkpoint</div>
+  </div>
+  <ul class="rules">
+    <li>OBBY La <b>lava</b> y el vacio te devuelven al último <b>checkpoint</b>.</li>
+    <li>OBBY Recoge <b>monedas</b> por el camino.</li>
+    <li>OBBY La flecha de arriba a la derecha te dice hacia dónde ir.</li>
+    <li>OBBY Son 6 etapas y cada una tiene un truco nuevo.</li>
+  </ul>
+  <button class="btn" id="playBtn">¡VAMOS!</button>
+  <p class="small">M = sonido · Rueda del ratón = zoom</p>
+</div></div>
+
+<div id="win" class="modal" style="display:none"><div class="card">
+  <h1>¡HAS GANADO!</h1>
+  <p class="sub">¡Completaste el Obby Arcoi­ris!</p>
+  <div id="stars"></div>
+  <div class="stats">
+    <div>TIME<b id="wTime">0:00</b>Tiempo</div>
+    <div>COINS<b id="wCoins">0</b>Monedas</div>
+    <div>DEATHS<b id="wDeaths">0</b>Caidas</div>
+  </div>
+  <button class="btn" id="againBtn">JUGAR OTRA VEZ</button>
+</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+if (typeof THREE === 'undefined') {
+  document.body.innerHTML = '<div style="padding:40px;font:24px system-ui;color:#1b1b2f">No se pudo cargar Three.js. Este juego necesita conexión a internet la primera vez que lo abres.</div>';
+  return;
+}
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+// ================= CONSTANTES =================
+const SPEED = 11, JUMP = 12.5, GRAV = 32, PADV = 23, H = 2.0, HW = 0.4;
+
+// ================= ESCENA =================
+const canvas = $('game');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8fd3ff);
+scene.fog = new THREE.Fog(0x8fd3ff, 70, 260);
+const camera = new THREE.PerspectiveCamera(65, 1, 0.1, 700);
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize); resize();
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x88aacc, 0.78));
+const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+const sc = sun.shadow.camera; sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; sc.near = 1; sc.far = 170;
+scene.add(sun); scene.add(sun.target);
+
+const water = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.MeshLambertMaterial({ color: 0x2b8cff, transparent: true, opacity: 0.85 }));
+water.rotation.x = -Math.PI / 2; water.position.y = -18; scene.add(water);
+
+// nubes
+const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+for (let i = 0; i < 34; i++) {
+  const g = new THREE.Group(), n = 3 + Math.floor(Math.random() * 3);
+  for (let j = 0; j < n; j++) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(rnd(6, 12), rnd(2, 4), rnd(4, 7)), cloudMat);
+    m.position.set(j * 5 - 6, rnd(0, 2), rnd(0, 3)); g.add(m);
+  }
+  g.position.set(rnd(-90, 90), rnd(26, 58), rnd(-30, 340)); scene.add(g);
+}
+
+// ================= TEXTURAS Y MATERIALES =================
+const studTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 64, 64);
+  g.fillStyle = 'rgba(0,0,0,.13)'; g.beginPath(); g.arc(32, 33, 15, 0, 7); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(32, 31, 12, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(0,0,0,.10)'; g.lineWidth = 2; g.strokeRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+})();
+function boxMats(color, w, d) {
+  const side = new THREE.MeshLambertMaterial({ color });
+  const t = studTex.clone(); t.needsUpdate = true; t.repeat.set(w / 2, d / 2);
+  const top = new THREE.MeshLambertMaterial({ color, map: t });
+  return [side, side, top, side, side, side];
+}
+
+// ================= NIVEL =================
+const solids = [], lavas = [], movers = [], spinners = [], tiles = [], coinList = [], cps = [];
+const lavaMat = new THREE.MeshLambertMaterial({ color: 0xff3d00, emissive: 0xff2200, emissiveIntensity: 0.6 });
+
+function addBox(o) {
+  const mats = o.type === 'lava' ? lavaMat : boxMats(o.color, o.w, o.d);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(o.w, o.h, o.d), mats);
+  mesh.position.set(o.x, o.y, o.z); mesh.castShadow = true; mesh.receiveShadow = true; scene.add(mesh);
+  const b = Object.assign({ type: 'solid', active: true }, o, { mesh });
+  (b.type === 'lava' ? lavas : solids).push(b);
+  return b;
+}
+const plat = (x, top, z, w, d, color, extra) => addBox(Object.assign({ x, y: top - 0.5, z, w, h: 1, d, color }, extra || {}));
+
+function rr(g, x, y, w, h, r) {
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+function sign(text, x, y, z, col) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(20,22,45,.82)'; rr(g, 4, 4, 504, 120, 26); g.fill();
+  g.lineWidth = 6; g.strokeStyle = col || '#fff'; g.stroke();
+  let size = 46; g.textAlign = 'center'; g.textBaseline = 'middle';
+  do { g.font = size + 'px "Fredoka One", "Trebuchet MS", system-ui, sans-serif'; size -= 2; } while (g.measureText(text).width > 460 && size > 16);
+  g.fillStyle = '#fff'; g.fillText(text, 256, 68);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
+  s.scale.set(11, 2.75, 1); s.position.set(x, y, z); scene.add(s); return s;
+}
+function checkpoint(idx, x, top, z, label) {
+  const b = plat(x, top, z, 10, 10, '#2ecc71', { type: 'check', cpIdx: idx });
+  const pole = new THREE.Mesh(new THREE.BoxGeometry(0.2, 4, 0.2), new THREE.MeshLambertMaterial({ color: 0xdddddd }));
+  pole.position.set(x - 3.5, top + 2, z - 3.5); pole.castShadow = true;
+  const flagMat = new THREE.MeshLambertMaterial({ color: idx === 0 ? 0x2ecc71 : 0xe74c3c });
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.1, 0.1), flagMat);
+  flag.position.set(x - 2.5, top + 3.4, z - 3.5);
+  scene.add(pole); scene.add(flag); b.flagMat = flagMat;
+  sign(label, x, top + 7, z, '#2ecc71');
+  cps[idx] = { x, y: top, z, box: b };
+  return b;
+}
+const coinGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.14, 20); coinGeo.rotateZ(Math.PI / 2);
+const coinMat = new THREE.MeshLambertMaterial({ color: 0xffd23f, emissive: 0xaa7700, emissiveIntensity: 0.6 });
+function coin(x, y, z) {
+  const m = new THREE.Mesh(coinGeo, coinMat); m.position.set(x, y, z); m.castShadow = true; scene.add(m);
+  coinList.push({ m, x, y, z, got: false });
+}
+function mover(x, top, z, w, d, color, axis, amp, sp, ph) {
+  const b = plat(x, top, z, w, d, color, { type: 'mover' });
+  Object.assign(b, { ox: x, oy: b.y, oz: z, axis, amp, sp, ph }); movers.push(b); return b;
+}
+function tile(x, top, z, w, d, color) {
+  const b = plat(x, top, z, w, d, color, { type: 'tile' });
+  Object.assign(b, { state: 'idle', t: 0, bx: b.x, by: b.y, bz: b.z }); tiles.push(b); return b;
+}
+function spinner(x, top, z, len, sp, color) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, 1, 0.8), new THREE.MeshLambertMaterial({ color }));
+  mesh.position.set(x, top + 0.5, z); mesh.castShadow = true; scene.add(mesh);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1.6, 16), new THREE.MeshLambertMaterial({ color: 0x333355 }));
+  hub.position.set(x, top + 0.8, z); hub.castShadow = true; scene.add(hub);
+  spinners.push({ x, z, top, len, sp, ang: Math.random() * 6, mesh });
+}
+
+// ---- Salida
+checkpoint(0, 0, 0, 0, 'ETAPA 1 · ¡Saltitos!');
+sign('WASD = moverte · ESPACIO = saltar', 0, 4.2, 10, '#ffd23f');
+
+// ---- Etapa 1: saltitos
+[[0, 0, 10], [2, 0.5, 16], [-2, 1, 22], [0, 1.5, 28], [3, 2, 34]].forEach(([x, t, z]) => { plat(x, t, z, 4, 4, '#7ee081'); coin(x, t + 1.4, z); });
+checkpoint(1, 0, 2, 44, 'ETAPA 2 · ¡El suelo es lava!');
+
+// ---- Etapa 2: lava
+addBox({ x: 0, y: 0, z: 67, w: 26, h: 1, d: 34, color: '#ff3d00', type: 'lava' });
+[[0, 53], [-3, 59.5], [0, 66], [3, 72.5], [0, 79]].forEach(([x, z]) => { plat(x, 2, z, 3, 3, '#ffa94d'); coin(x, 3.4, z); });
+checkpoint(2, 0, 2, 89, 'ETAPA 3 · Plataformas móviles');
+
+// ---- Etapa 3: plataformas mÃ³viles
+[[100, 0], [107, 2.1], [114, 4.2]].forEach(([z, ph]) => { mover(0, 2, z, 4, 4, '#b57bff', 'x', 5, 1.2, ph); coin(0, 3.6, z); });
+checkpoint(3, 0, 2, 125, 'ETAPA 4 · Barras giratorias');
+
+// ---- Etapa 4: barras giratorias
+plat(0, 2, 141, 18, 18, '#4dd0e1'); spinner(0, 2, 141, 16, 1.7, '#ff5a5f');
+plat(0, 2, 155.5, 3, 5, '#80deea');
+plat(0, 2, 168, 18, 18, '#4dd0e1'); spinner(0, 2, 168, 16, -2.1, '#ff5a5f');
+plat(0, 2, 180, 3, 5, '#80deea');
+coin(6, 3.4, 136); coin(-6, 3.4, 146); coin(0, 3.4, 155.5); coin(6, 3.4, 163); coin(-6, 3.4, 173); coin(0, 3.4, 180);
+checkpoint(4, 0, 2, 188, 'ETAPA 5 · ¡Se caen!');
+
+// ---- Etapa 5: baldosas que caen
+[[0, 198], [2.5, 203.5], [-2.5, 209], [0, 214.5], [2.5, 220], [-2.5, 225.5], [0, 231]].forEach(([x, z]) => { tile(x, 2, z, 3.5, 3.5, '#ff8fab'); coin(x, 3.5, z); });
+checkpoint(5, 0, 2, 241, 'ETAPA 6 · ¡Súper salto!');
+
+// ---- Etapa 6: almohadilla y escaleras
+plat(0, 2, 248, 4, 4, '#e056fd', { type: 'bounce' });
+sign('¡Corre hacia delante y vuela! ', 0, 9, 248, '#e056fd');
+plat(0, 8, 260, 8, 8, '#ffd23f'); coin(0, 9.4, 260);
+[[3, 9, 270], [-1, 10, 276], [2, 11, 282], [0, 12, 288]].forEach(([x, t, z]) => { plat(x, t, z, 4, 4, '#ffd23f'); coin(x, t + 1.4, z); });
+
+// ---- Meta
+const GOAL = { x: 0, y: 12, z: 300 };
+plat(0, 12, 300, 14, 14, '#ffd23f', { type: 'goal' });
+sign('¡META!', 0, 22, 300, '#ffd23f');
+const trophy = new THREE.Group();
+const gold = new THREE.MeshLambertMaterial({ color: 0xffd23f, emissive: 0xaa8800, emissiveIntensity: 0.7 });
+const tm = (geo, y) => { const m = new THREE.Mesh(geo, gold); m.position.y = y; m.castShadow = true; trophy.add(m); return m; };
+tm(new THREE.CylinderGeometry(1.2, 1.4, 0.5, 16), 0.25);
+tm(new THREE.CylinderGeometry(0.25, 0.25, 1.4, 12), 1.2);
+tm(new THREE.CylinderGeometry(1.2, 0.6, 1.8, 16), 2.6);
+const h1 = tm(new THREE.TorusGeometry(0.6, 0.12, 8, 16), 2.7); h1.position.x = 1.3;
+const h2 = tm(new THREE.TorusGeometry(0.6, 0.12, 8, 16), 2.7); h2.position.x = -1.3;
+trophy.position.set(GOAL.x, GOAL.y, GOAL.z); scene.add(trophy);
+const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 140, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff2a8, transparent: true, opacity: 0.3, depthWrite: false, fog: false, side: THREE.DoubleSide }));
+beam.position.set(GOAL.x, GOAL.y + 70, GOAL.z); scene.add(beam);
+
+$('coinsTot').textContent = coinList.length;
+
+// ================= PERSONAJE =================
+const char = new THREE.Group(); scene.add(char);
+const lam = c => new THREE.MeshLambertMaterial({ color: c });
+function part(w, h, d, color, x, y, z, parent) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), lam(color));
+  m.position.set(x, y, z); m.castShadow = true; (parent || char).add(m); return m;
+}
+function limb(x, y, w, h, color) {
+  const pivot = new THREE.Group(); pivot.position.set(x, y, 0); char.add(pivot);
+  part(w, h, 0.4, color, 0, -h / 2, 0, pivot); return pivot;
+}
+const legL = limb(-0.2, 0.7, 0.38, 0.7, 0x2ecc71), legR = limb(0.2, 0.7, 0.38, 0.7, 0x2ecc71);
+part(0.8, 0.8, 0.4, 0x4a7bff, 0, 1.1, 0);
+const armL = limb(-0.55, 1.5, 0.3, 0.8, 0xf6d33d), armR = limb(0.55, 1.5, 0.3, 0.8, 0xf6d33d);
+const faceTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#f6d33d'; g.fillRect(0, 0, 64, 64);
+  g.fillStyle = '#222'; g.fillRect(18, 18, 8, 12); g.fillRect(38, 18, 8, 12);
+  g.strokeStyle = '#222'; g.lineWidth = 4; g.lineCap = 'round';
+  g.beginPath(); g.arc(32, 36, 14, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke();
+  return new THREE.CanvasTexture(c);
+})();
+const headMats = [lam(0xf6d33d), lam(0xf6d33d), lam(0xf6d33d), lam(0xf6d33d), new THREE.MeshLambertMaterial({ map: faceTex }), lam(0xf6d33d)];
+const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.55), headMats);
+head.position.set(0, 1.78, 0); head.castShadow = true; char.add(head);
+
+// ================= PARTÃCULAS =================
+const pcs = []; const pgeo = new THREE.BoxGeometry(0.28, 0.28, 0.28);
+for (let i = 0; i < 160; i++) {
+  const m = new THREE.Mesh(pgeo, new THREE.MeshBasicMaterial({ color: 0xffffff })); m.visible = false; scene.add(m);
+  pcs.push({ m, vx: 0, vy: 0, vz: 0, life: 0 });
+}
+function burst(x, y, z, n, colors, sp) {
+  for (let i = 0, k = 0; i < pcs.length && k < n; i++) {
+    const p = pcs[i]; if (p.life > 0) continue;
+    p.life = rnd(0.7, 1.3); p.m.visible = true; p.m.position.set(x, y, z); p.m.scale.set(1, 1, 1);
+    p.m.material.color.set(colors[Math.floor(Math.random() * colors.length)]);
+    p.vx = rnd(-sp, sp); p.vy = rnd(sp * 0.3, sp * 1.1); p.vz = rnd(-sp, sp); k++;
+  }
+}
+function updateParticles(dt) {
+  for (const p of pcs) {
+    if (p.life <= 0) continue;
+    p.life -= dt; p.vy -= 22 * dt;
+    p.m.position.x += p.vx * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt;
+    p.m.rotation.x += dt * 6; p.m.rotation.y += dt * 5;
+    const s = clamp(p.life * 2, 0, 1); p.m.scale.set(s, s, s);
+    if (p.life <= 0) p.m.visible = false;
+  }
+}
+
+// ================= SONIDO =================
+let ac = null, muted = false;
+function audio() { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) {} }
+function tone(f, d, type, v, slide) {
+  try {
+    if (!ac || muted) return;
+    const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+    o.type = type || 'square'; o.frequency.setValueAtTime(f, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t + d);
+    g.gain.setValueAtTime(v || 0.06, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g); g.connect(ac.destination); o.start(); o.stop(t + d);
+  } catch (e) {}
+}
+const sfx = {
+  jump: () => tone(380, 0.14, 'square', 0.04, 300),
+  coin: () => { tone(988, 0.08, 'triangle', 0.07); setTimeout(() => tone(1319, 0.14, 'triangle', 0.07), 70); },
+  die: () => tone(420, 0.35, 'sawtooth', 0.08, -330),
+  check: () => [523, 659, 784].forEach((f, i) => setTimeout(() => tone(f, 0.15, 'triangle', 0.07), i * 90)),
+  pad: () => tone(200, 0.4, 'sine', 0.1, 700),
+  hit: () => tone(150, 0.15, 'sawtooth', 0.08, -80),
+  win: () => [523, 659, 784, 1047, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.2, 'triangle', 0.08), i * 130))
+};
+
+// ================= ESTADO =================
+const P = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, onGround: false, ground: null, coyote: 0, jumpBuf: 0, stun: 0, anim: 0 };
+const cam = { yaw: 0, pitch: 0.42, dist: 14 };
+const camT = { x: 0, y: 1.6, z: 0 };
+let state = 'menu', T = 0, timer = 0, coins = 0, deaths = 0, dead = false, deadT = 0, cpIdx = 0, faceAng = 0, winT = 0;
+let spawnPt = { x: 0, y: 0, z: 0 };
+
+const stageNames = ['ETAPA 1 · ¡Saltitos!', 'ETAPA 2 · ¡El suelo es lava!', 'ETAPA 3 · Plataformas móviles', 'ETAPA 4 · Barras giratorias', 'ETAPA 5 · ¡Se caen!', 'ETAPA 6 · ¡Súper salto!'];
+const hints = [
+  'Salta de plataforma en plataforma · ESPACIO = saltar',
+  '¡No toques la lava! Salta entre las plataformas',
+  'Espera a que la plataforma se acerque y sube',
+  'Salta por encima de la barra cuando pase',
+  'Las baldosas se caen al pisarlas ¦ ¡no te pares!',
+  'Pisa la almohadilla morada para salir volando'
+];
+
+// ================= ENTRADA =================
+const keys = {};
+window.addEventListener('keydown', e => {
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  keys[e.code] = true;
+  if (e.code === 'Space') P.jumpBuf = 0.14;
+  if (e.code === 'KeyR' && state === 'play' && !dead) { respawn(); toast('â†© Vuelves al checkpoint'); }
+  if (e.code === 'KeyM') muted = !muted;
+  if (e.code === 'Enter' && state === 'menu') startGame();
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+let drag = null;
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('pointerdown', e => { if (!drag) { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; try { canvas.setPointerCapture(e.pointerId); } catch (x) {} } });
+canvas.addEventListener('pointermove', e => {
+  if (drag && e.pointerId === drag.id) {
+    cam.yaw -= (e.clientX - drag.x) * 0.006; cam.pitch = clamp(cam.pitch + (e.clientY - drag.y) * 0.005, 0.08, 1.35);
+    drag.x = e.clientX; drag.y = e.clientY;
+  }
+});
+const endDrag = e => { if (drag && e.pointerId === drag.id) drag = null; };
+canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('wheel', e => { cam.dist = clamp(cam.dist + e.deltaY * 0.01, 6, 30); e.preventDefault(); }, { passive: false });
+
+// controles táctiles
+const joy = { x: 0, y: 0, id: null }, joyEl = $('joy'), knob = $('knob'), jumpBtn = $('jumpBtn');
+const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+if (isTouch) { joyEl.style.display = 'block'; jumpBtn.style.display = 'flex'; }
+function updJoy(e) {
+  const r = joyEl.getBoundingClientRect();
+  let dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2), dy = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
+  const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; }
+  joy.x = dx; joy.y = dy; knob.style.transform = 'translate(' + dx * 35 + 'px,' + dy * 35 + 'px)';
+}
+joyEl.addEventListener('pointerdown', e => { joy.id = e.pointerId; try { joyEl.setPointerCapture(e.pointerId); } catch (x) {} updJoy(e); });
+joyEl.addEventListener('pointermove', e => { if (e.pointerId === joy.id) updJoy(e); });
+const joyEnd = e => { if (e.pointerId === joy.id) { joy.id = null; joy.x = joy.y = 0; knob.style.transform = 'translate(0,0)'; } };
+joyEl.addEventListener('pointerup', joyEnd); joyEl.addEventListener('pointercancel', joyEnd);
+jumpBtn.addEventListener('pointerdown', e => { P.jumpBuf = 0.14; e.preventDefault(); });
+
+// ================= HUD =================
+let lastTxt = {};
+function setText(id, v) { if (lastTxt[id] !== v) { lastTxt[id] = v; $(id).textContent = v; } }
+function toast(t) { const el = $('toast'); el.textContent = t; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
+function flash() { const el = $('flash'); el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); }
+function fmt(t) { const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
+
+// ================= LÃ“GICA =================
+function hit(b, m) {
+  return P.x + HW > b.x - b.w / 2 && P.x - HW < b.x + b.w / 2 &&
+         P.z + HW > b.z - b.d / 2 && P.z - HW < b.z + b.d / 2 &&
+         P.y + H > b.y - b.h / 2 + m && P.y < b.y + b.h / 2 - m;
+}
+
+function setCheckpoint(b) {
+  if (b.cpIdx > cpIdx) {
+    cpIdx = b.cpIdx; spawnPt = { x: b.x, y: b.y + b.h / 2, z: b.z };
+    b.flagMat.color.set(0x2ecc71);
+    toast('¡Checkpoint guardado!'); sfx.check();
+    burst(b.x, b.y + 3, b.z, 30, [0x2ecc71, 0xffd23f, 0xffffff], 7);
+  }
+}
+
+function die() {
+  if (dead || state !== 'play') return;
+  dead = true; deaths++; deadT = 0.9; char.visible = false;
+  burst(P.x, P.y + 1, P.z, 34, [0xf6d33d, 0x4a7bff, 0x2ecc71], 9);
+  sfx.die(); flash();
+}
+function respawn() {
+  P.x = spawnPt.x; P.y = spawnPt.y + 0.05; P.z = spawnPt.z; P.vx = P.vy = P.vz = 0; P.stun = 0; P.ground = null;
+  char.visible = true; dead = false;
+  camT.x = P.x; camT.y = P.y + 1.6; camT.z = P.z;
+}
+function win() {
+  if (state !== 'play') return;
+  state = 'win'; winT = 0; sfx.win();
+  $('wTime').textContent = fmt(timer); $('wCoins').textContent = coins + '/' + coinList.length; $('wDeaths').textContent = deaths;
+  $('stars').textContent = '­'.repeat(1 + (deaths <= 10 ? 1 : 0) + (coins === coinList.length ? 1 : 0));
+  setTimeout(() => { if (state === 'win') $('win').style.display = 'flex'; }, 1800);
+}
+
+function resetGame() {
+  coins = 0; deaths = 0; timer = 0; cpIdx = 0; dead = false;
+  spawnPt = { x: 0, y: 0, z: 0 };
+  for (const c of coinList) { c.got = false; c.m.visible = true; }
+  for (const t of tiles) { t.state = 'idle'; t.active = true; t.mesh.visible = true; t.mesh.position.set(t.bx, t.by, t.bz); }
+  for (const c of cps) if (c && c.box.cpIdx > 0) c.box.flagMat.color.set(0xe74c3c);
+  respawn(); lastTxt = {};
+}
+function startGame() {
+  audio();
+  $('intro').style.display = 'none'; $('win').style.display = 'none'; $('hud').style.display = 'block';
+  resetGame(); cam.yaw = 0; cam.pitch = 0.42; state = 'play';
+  toast('ESPACIO para saltar');
+}
+$('playBtn').addEventListener('click', startGame);
+$('againBtn').addEventListener('click', startGame);
+
+function step(dt) {
+  const kf = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
+  const kr = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
+  let f = kf - joy.y, r = kr + joy.x; const l = Math.hypot(f, r);
+  if (l > 1) { f /= l; r /= l; }
+  const fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw), rx = -fz, rz = fx;
+  const mx = fx * f + rx * r, mz = fz * f + rz * r;
+  const ctl = P.stun > 0 ? 0.12 : 1;
+  const acc = Math.min(1, (P.onGround ? 16 : 8) * ctl * dt);
+  P.vx += (mx * SPEED - P.vx) * acc; P.vz += (mz * SPEED - P.vz) * acc;
+  P.vy = Math.max(-35, P.vy - GRAV * dt);
+  P.jumpBuf -= dt; P.coyote -= dt; if (P.onGround) P.coyote = 0.12;
+  if (P.jumpBuf > 0 && P.coyote > 0) { P.vy = JUMP; P.coyote = 0; P.jumpBuf = 0; P.onGround = false; sfx.jump(); }
+
+  P.onGround = false; P.ground = null;
+  P.x += P.vx * dt;
+  for (const b of solids) if (b.active && hit(b, 0.05)) {
+    const pl = (P.x + HW) - (b.x - b.w / 2), pr = (b.x + b.w / 2) - (P.x - HW);
+    if (pl < pr) P.x -= pl + 0.001; else P.x += pr + 0.001; P.vx = 0;
+  }
+  P.z += P.vz * dt;
+  for (const b of solids) if (b.active && hit(b, 0.05)) {
+    const pl = (P.z + HW) - (b.z - b.d / 2), pr = (b.z + b.d / 2) - (P.z - HW);
+    if (pl < pr) P.z -= pl + 0.001; else P.z += pr + 0.001; P.vz = 0;
+  }
+  P.y += P.vy * dt;
+  for (const b of solids) if (b.active && hit(b, 0)) {
+    if (P.vy <= 0) { P.y = b.y + b.h / 2; P.vy = 0; P.onGround = true; P.ground = b; }
+    else { P.y = b.y - b.h / 2 - H; P.vy = 0; }
+  }
+
+  const g = P.ground;
+  if (g) {
+    if (g.type === 'bounce') { P.vy = PADV; P.onGround = false; P.ground = null; sfx.pad(); burst(P.x, P.y + 0.3, P.z, 16, [0xe056fd, 0xffffff], 6); }
+    else if (g.type === 'check') setCheckpoint(g);
+    else if (g.type === 'tile' && g.state === 'idle') { g.state = 'shake'; g.t = 0; }
+    else if (g.type === 'goal') win();
+  }
+  for (const b of lavas) if (hit(b, 0)) die();
+  if (P.y < -22) die();
+}
+
+function updateWorld(dt) {
+  for (const m of movers) {
+    const px = m.x, pz = m.z, s = Math.sin(T * m.sp + m.ph) * m.amp;
+    m.x = m.ox + (m.axis === 'x' ? s : 0); m.z = m.oz + (m.axis === 'z' ? s : 0);
+    m.mesh.position.set(m.x, m.y, m.z);
+    if (P.ground === m && state === 'play' && !dead) { P.x += m.x - px; P.z += m.z - pz; }
+  }
+  for (const t of tiles) {
+    if (t.state === 'shake') {
+      t.t += dt; t.mesh.position.x = t.bx + (Math.random() - 0.5) * 0.18; t.mesh.position.z = t.bz + (Math.random() - 0.5) * 0.18;
+      if (t.t > 0.6) { t.state = 'fall'; t.t = 0; t.active = false; }
+    } else if (t.state === 'fall') {
+      t.t += dt; t.mesh.position.y = t.by - t.t * t.t * 18; t.mesh.visible = t.t < 1.2;
+      if (t.t > 3) { t.state = 'idle'; t.active = true; t.mesh.visible = true; t.mesh.position.set(t.bx, t.by, t.bz); }
+    }
+  }
+  for (const s of spinners) { s.ang += s.sp * dt; s.mesh.rotation.y = s.ang; }
+  for (const c of coinList) if (!c.got) { c.m.rotation.y += dt * 3; c.m.position.y = c.y + Math.sin(T * 3 + c.x) * 0.15; }
+  lavaMat.emissiveIntensity = 0.55 + Math.sin(T * 3) * 0.2;
+  trophy.rotation.y += dt * 1.2;
+  beam.material.opacity = 0.26 + Math.sin(T * 2) * 0.05;
+}
+
+function updateChar(dt) {
+  char.position.set(P.x, P.y, P.z);
+  const sp = Math.hypot(P.vx, P.vz);
+  if (sp > 1.2) {
+    let d = Math.atan2(P.vx, P.vz) - faceAng; d = Math.atan2(Math.sin(d), Math.cos(d));
+    faceAng += d * Math.min(1, 14 * dt);
+  }
+  char.rotation.y = faceAng;
+  P.anim += dt * (4 + sp * 0.9);
+  const air = !P.onGround || state === 'win';
+  const sw = Math.sin(P.anim) * 0.9 * (air ? 0 : Math.min(1, sp / SPEED));
+  const k = Math.min(1, 18 * dt), up = -2.7;
+  legL.rotation.x += (sw - legL.rotation.x) * k; legR.rotation.x += (-sw - legR.rotation.x) * k;
+  armL.rotation.x += ((air ? up : -sw) - armL.rotation.x) * k; armR.rotation.x += ((air ? up : sw) - armR.rotation.x) * k;
+}
+
+function updateCamera(dt) {
+  if (state === 'menu') { cam.yaw += dt * 0.25; cam.pitch = 0.35; }
+  if (state === 'win') cam.yaw += dt * 0.4;
+  if (state === 'play') {
+    const q = (keys.KeyQ ? 1 : 0) - (keys.KeyE ? 1 : 0); cam.yaw += q * 2 * dt;
+  }
+  const k = 1 - Math.exp(-12 * dt);
+  camT.x += (P.x - camT.x) * k; camT.y += (P.y + 1.6 - camT.y) * k; camT.z += (P.z - camT.z) * k;
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  camera.position.set(camT.x - Math.sin(cam.yaw) * cp * cam.dist, camT.y + sp * cam.dist, camT.z - Math.cos(cam.yaw) * cp * cam.dist);
+  camera.lookAt(camT.x, camT.y, camT.z);
+  sun.position.set(P.x + 30, P.y + 55, P.z + 20); sun.target.position.set(P.x, P.y, P.z);
+  water.position.x = P.x; water.position.z = P.z;
+}
+
+function updateHUD() {
+  setText('coins', String(coins)); setText('deaths', String(deaths)); setText('time', fmt(timer));
+  setText('stageName', state === 'win' ? '¡META!' : stageNames[cpIdx]);
+  setText('hint', hints[cpIdx]);
+  $('barFill').style.width = clamp(P.z / GOAL.z, 0, 1) * 100 + '%';
+  const tgt = cps[cpIdx + 1] || GOAL;
+  const dx = tgt.x - P.x, dz = tgt.z - P.z;
+  const fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw), rx = -fz, rz = fx;
+  const ang = Math.atan2(dx * rx + dz * rz, dx * fx + dz * fz);
+  $('arrow').style.transform = 'rotate(' + ang + 'rad)';
+  setText('gTxt', cps[cpIdx + 1] ? 'Siguiente checkpoint' : 'Trofeo dorado');
+  setText('gDist', Math.round(Math.hypot(dx, dz)) + ' m');
+}
+
+function update(dt) {
+  T += dt;
+  updateWorld(dt);
+  if (state === 'play') {
+    if (!dead) {
+      for (let i = 0; i < 2; i++) step(dt / 2);
+      P.stun = Math.max(0, P.stun - dt); timer += dt;
+      // barras giratorias
+      for (const s of spinners) {
+        if (P.y < s.top + 1.0 && P.y + H > s.top) {
+          const dx = Math.cos(s.ang), dz = -Math.sin(s.ang), hl = s.len / 2;
+          const t = clamp((P.x - s.x) * dx + (P.z - s.z) * dz, -hl, hl);
+          const ex = P.x - (s.x + dx * t), ez = P.z - (s.z + dz * t), d = Math.hypot(ex, ez);
+          if (d < HW + 0.4) {
+            const nx = d > 0.001 ? ex / d : -dz, nz = d > 0.001 ? ez / d : dx;
+            P.vx = nx * 14; P.vz = nz * 14; P.vy = Math.max(P.vy, 7); P.stun = 0.4; P.onGround = false; sfx.hit();
+          }
+        }
+      }
+      // monedas
+      for (const c of coinList) if (!c.got && Math.hypot(c.x - P.x, c.z - P.z) < 1.2 && Math.abs(c.y - (P.y + 1)) < 1.6) {
+        c.got = true; c.m.visible = false; coins++; sfx.coin(); burst(c.x, c.y, c.z, 8, [0xffd23f, 0xffffff], 4);
+      }
+    } else { deadT -= dt; if (deadT <= 0) respawn(); }
+  } else if (state === 'win') {
+    winT += dt;
+    if (winT < 5) burst(GOAL.x + rnd(-5, 5), GOAL.y + 8, GOAL.z + rnd(-5, 5), 3, [0xff5a5f, 0xffd23f, 0x2ecc71, 0x4a7bff, 0xe056fd], 4);
+  }
+  updateParticles(dt);
+  updateChar(dt);
+  updateCamera(dt);
+  if (state !== 'menu') updateHUD();
+}
+
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.033, (now - last) / 1000); last = now;
+  update(dt);
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
